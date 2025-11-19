@@ -6,84 +6,77 @@
 #include <ctime>
 #include <conio.h>
 #include <windows.h>
+
 using namespace std;
 
-// Блок констант для настройки игры
-const int FIELD_WIDTH = 40;          // Ширина игрового поля
-const int FIELD_HEIGHT = 20;         // Высота игрового поля
-const int SNAKE_LENGTH = 3;          // Начальная длина змейки
-const int GAME_SPEED = 150;          // Скорость игры (задержка в миллисекундах)
+const int FIELD_WIDTH = 40;
+const int FIELD_HEIGHT = 20;
+const int INITIAL_SNAKE_LENGTH = 3;
+const int GAME_SPEED = 150;
+const int SCORE_POSITION_X = 8;
+const int INFO_START_Y = 23;
+const int CURSOR_SIZE = 100;
+const int FIELD_CENTER_X = 20;
+const int FIELD_CENTER_Y = 10;
+const int BORDER_OFFSET = 1;
 
-// Символы для отрисовки игрового поля
-const char BORDER_HORIZONTAL = '=';  // Горизонтальная граница
-const char BORDER_VERTICAL = '|';    // Вертикальная граница
-const char BORDER_CORNER = '+';      // Угол границы
-const char EMPTY_CHAR = ' ';         // Пустая клетка
-const char SNAKE_HEAD_CHAR = 'O';    // Голова змейки
-const char SNAKE_BODY_CHAR = 'o';    // Тело змейки
-const char APPLE_CHAR = 'A';         // Яблоко
+const char BORDER_HORIZONTAL = '=';
+const char BORDER_VERTICAL = '|';
+const char BORDER_CORNER = '+';
+const char EMPTY_CHAR = ' ';
+const char SNAKE_HEAD_CHAR = 'O';
+const char SNAKE_BODY_CHAR = 'o';
+const char APPLE_CHAR = 'A';
 
-// Текстовые сообщения для интерфейса
 const string MSG_LEGEND = "O - snake head, o - snake body, A - apple";
 const string MSG_SIZE = "Field size: ";
 const string MSG_CONTROLS = "Controls: W - up, A - left, S - down, D - right";
 const string MSG_GAME_OVER = "Game Over!";
 const string MSG_SCORE = "Score: ";
 
-// Базовый шаблон игрового поля (пустое поле)
-const vector < string > BASE_GRID(FIELD_HEIGHT, string(FIELD_WIDTH, EMPTY_CHAR));
-
-// Перечисление для направлений движения змейки
 enum Direction 
 {
-  UP,     // Вверх
-  DOWN,   // Вниз
-  LEFT,   // Влево
-  RIGHT   // Вправо
+  UP,
+  DOWN,
+  LEFT,
+  RIGHT
 };
 
-// Функция для установки позиции курсора в консоли
 void SetCursorPosition(int x, int y) 
 {
-  COORD coord;          // Структура для координат
-  coord.X = x;          // Установка X координаты
-  coord.Y = y;          // Установка Y координаты
-  // Установка позиции курсора в консоли
+  COORD coord = 
+  {
+    static_cast < SHORT > (x),
+    static_cast < SHORT > (y)
+  };
   SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 }
 
-// Функция для скрытия курсора в консоли
 void HideCursor() 
 {
-  CONSOLE_CURSOR_INFO cursorInfo;  // Структура информации о курсоре
-  cursorInfo.dwSize = 100;         // Размер курсора
-  cursorInfo.bVisible = FALSE;     // Сделать курсор невидимым
-  // Применение настроек курсора
+  CONSOLE_CURSOR_INFO cursorInfo;
+  cursorInfo.dwSize = CURSOR_SIZE;
+  cursorInfo.bVisible = FALSE;
   SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), & cursorInfo);
 }
 
-// Функция генерации начальной змейки
 vector < pair < int, int >> GenerateSnake() 
 {
-  int headX = FIELD_WIDTH / 2;  // Стартовая X координата головы (центр)
-  int headY = FIELD_HEIGHT / 2; // Стартовая Y координата головы (центр)
-  vector < pair < int, int >> snake;  // Вектор для хранения сегментов змейки
-  
-  // Создание змейки заданной длины
-  for (int i = 0; i < SNAKE_LENGTH; ++i)
+  vector < pair < int, int >> snake;
+
+  for (int i = 0; i < INITIAL_SNAKE_LENGTH; ++i)
     snake.push_back({
-      headX - i,  // Каждый следующий сегмент смещен влево
-      headY       // Y координата одинакова для всех сегментов
+      FIELD_CENTER_X - i,
+      FIELD_CENTER_Y
     });
+
   return snake;
 }
 
-// Функция генерации яблока в случайной позиции
 pair < int, int > GenerateApple(const vector < pair < int, int >> & snake) 
 {
   while (true) 
   {
-    // Генерация случайных координат для яблока
     int appleX = rand() % FIELD_WIDTH;
     int appleY = rand() % FIELD_HEIGHT;
     pair < int, int > apple = 
@@ -92,231 +85,211 @@ pair < int, int > GenerateApple(const vector < pair < int, int >> & snake)
       appleY
     };
 
-    // Проверка, не попадает ли яблоко на змейку
     bool onSnake = false;
     for (const auto & segment: snake) 
     {
-      if (segment == apple) 
+      if (segment == apple)
       {
         onSnake = true;
         break;
       }
     }
 
-    // Если яблоко не на змейке - возвращаем его позицию
     if (!onSnake) return apple;
   }
 }
 
-// Функция проверки столкновений
 bool CheckCollision(const vector < pair < int, int >> & snake) 
 {
-  auto head = snake[0];  // Получаем голову змейки
+  auto head = snake[0];
 
-  // Проверка столкновения с границами поля
   if (head.first < 0 || head.first >= FIELD_WIDTH ||
     head.second < 0 || head.second >= FIELD_HEIGHT)
-    return true;  // Столкновение с границей
+    return true;
 
-  // Проверка столкновения головы с телом змейки
   for (size_t i = 1; i < snake.size(); ++i) 
   {
-    if (head == snake[i]) return true;  // Столкновение с самим собой
+    if (head == snake[i]) return true;
   }
 
-  return false;  // Столкновений нет
+  return false;
 }
 
-// Функция отрисовки игрового поля
-void DrawField(const vector < pair < int, int >> & snake, pair < int, int > apple, int score, bool firstDraw) 
+void DrawBorders()
+ {
+  SetCursorPosition(0, 0);
+  cout << BORDER_CORNER;
+  for (int i = 0; i < FIELD_WIDTH; ++i) cout << BORDER_HORIZONTAL;
+  cout << BORDER_CORNER;
+
+  for (int y = 0; y < FIELD_HEIGHT; ++y)
+   {
+    SetCursorPosition(0, y + BORDER_OFFSET);
+    cout << BORDER_VERTICAL;
+    SetCursorPosition(FIELD_WIDTH + BORDER_OFFSET, y + BORDER_OFFSET);
+    cout << BORDER_VERTICAL;
+  }
+
+  SetCursorPosition(0, FIELD_HEIGHT + BORDER_OFFSET);
+  cout << BORDER_CORNER;
+  for (int i = 0; i < FIELD_WIDTH; ++i) cout << BORDER_HORIZONTAL;
+  cout << BORDER_CORNER;
+}
+
+void DrawInfo(int score) 
 {
-  // Первоначальная отрисовка (только при первом вызове)
+  SetCursorPosition(0, INFO_START_Y);
+  cout << MSG_SCORE << score;
+  SetCursorPosition(0, INFO_START_Y + 1);
+  cout << MSG_LEGEND;
+  SetCursorPosition(0, INFO_START_Y + 2);
+  cout << MSG_SIZE << FIELD_WIDTH << "x" << FIELD_HEIGHT;
+  SetCursorPosition(0, INFO_START_Y + 3);
+  cout << MSG_CONTROLS;
+}
+
+void ClearOldPositions(const vector < pair < int, int >> & oldSnake,
+  const vector < pair < int, int >> & newSnake,
+    const pair < int, int > & apple)
+    {
+  for (const auto & segment: oldSnake) 
+  {
+    bool isInNewSnake = false;
+    for (const auto & newSegment: newSnake) 
+    {
+      if (segment == newSegment) 
+      {
+        isInNewSnake = true;
+        break;
+      }
+    }
+
+    if (!isInNewSnake && segment != apple) {
+      SetCursorPosition(segment.first + BORDER_OFFSET, segment.second + BORDER_OFFSET);
+      cout << EMPTY_CHAR;
+    }
+  }
+}
+
+void DrawField(const vector < pair < int, int >> & snake,
+  const vector < pair < int, int >> & oldSnake, pair < int, int > apple, int score, bool firstDraw) 
+  {
   if (firstDraw) 
   {
-    system("cls");  // Очистка консоли
-    HideCursor();   // Скрытие курсора
-
-    // Отрисовка верхней границы
-    SetCursorPosition(0, 0);
-    cout << BORDER_CORNER;
-    for (int i = 0; i < FIELD_WIDTH; ++i) cout << BORDER_HORIZONTAL;
-    cout << BORDER_CORNER;
-
-    // Отрисовка боковых границ
-    for (int y = 0; y < FIELD_HEIGHT; ++y) 
-    {
-      SetCursorPosition(0, y + 1);
-      cout << BORDER_VERTICAL;
-      SetCursorPosition(FIELD_WIDTH + 1, y + 1);
-      cout << BORDER_VERTICAL;
-    }
-
-    // Отрисовка нижней границы
-    SetCursorPosition(0, FIELD_HEIGHT + 1);
-    cout << BORDER_CORNER;
-    for (int i = 0; i < FIELD_WIDTH; ++i) cout << BORDER_HORIZONTAL;
-    cout << BORDER_CORNER;
-
-    // Отрисовка информационных сообщений
-    SetCursorPosition(0, FIELD_HEIGHT + 3);
-    cout << MSG_SCORE << score;
-    SetCursorPosition(0, FIELD_HEIGHT + 4);
-    cout << MSG_LEGEND;
-    SetCursorPosition(0, FIELD_HEIGHT + 5);
-    cout << MSG_SIZE << FIELD_WIDTH << "x" << FIELD_HEIGHT;
-    SetCursorPosition(0, FIELD_HEIGHT + 6);
-    cout << MSG_CONTROLS;
+    system("cls");
+    HideCursor();
+    DrawBorders();
+    DrawInfo(score);
   }
 
-  // Очистка только тех клеток, где нет змейки или яблока
-  for (int y = 0; y < FIELD_HEIGHT; ++y) 
+  if (!firstDraw) 
   {
-    for (int x = 0; x < FIELD_WIDTH; ++x) 
-    {
-      bool isSnakeOrApple = false;
-
-      // Проверка, находится ли в этой клетке сегмент змейки
-      for (const auto & segment: snake) 
-      {
-        if (segment.first == x && segment.second == y) 
-        {
-          isSnakeOrApple = true;
-          break;
-        }
-      }
-
-      // Проверка, находится ли в этой клетке яблоко
-      if (apple.first == x && apple.second == y) 
-      {
-        isSnakeOrApple = true;
-      }
-
-      // Если клетка пустая - очищаем ее
-      if (!isSnakeOrApple) 
-      {
-        SetCursorPosition(x + 1, y + 1);
-        cout << EMPTY_CHAR;
-      }
-    }
+    ClearOldPositions(oldSnake, snake, apple);
   }
 
-  // Отрисовка яблока
-  SetCursorPosition(apple.first + 1, apple.second + 1);
+  SetCursorPosition(apple.first + BORDER_OFFSET, apple.second + BORDER_OFFSET);
   cout << APPLE_CHAR;
 
-  // Отрисовка змейки
-  for (size_t i = 0; i < snake.size(); ++i) 
+  for (size_t i = 0; i < snake.size(); ++i)
   {
-    auto[x, y] = snake[i];  // Получаем координаты сегмента
-    SetCursorPosition(x + 1, y + 1);
-    // Голова отрисовывается одним символом, тело - другим
+    auto[x, y] = snake[i];
+    SetCursorPosition(x + BORDER_OFFSET, y + BORDER_OFFSET);
     cout << (i == 0 ? SNAKE_HEAD_CHAR : SNAKE_BODY_CHAR);
   }
 
-  // Обновление счета
-  SetCursorPosition(MSG_SCORE.length() + 1, FIELD_HEIGHT + 3);
+  SetCursorPosition(SCORE_POSITION_X, INFO_START_Y);
   cout << score;
 }
 
-// Функция движения змейки
 void MoveSnake(vector < pair < int, int >> & snake, Direction dir, bool grow) 
 {
-  auto head = snake[0];  // Текущая позиция головы
+  auto head = snake[0];
 
-  // Изменение координат головы в зависимости от направления
   switch (dir) 
   {
   case UP:
-    head.second--;  // Движение вверх (уменьшение Y)
+    head.second--;
     break;
   case DOWN:
-    head.second++;  // Движение вниз (увеличение Y)
+    head.second++;
     break;
   case LEFT:
-    head.first--;   // Движение влево (уменьшение X)
+    head.first--;
     break;
   case RIGHT:
-    head.first++;   // Движение вправо (увеличение X)
+    head.first++;
     break;
   }
 
-  // Добавление новой головы в начало вектора
   snake.insert(snake.begin(), head);
-  // Если змейка не растет - удаляем хвост
   if (!grow) snake.pop_back();
 }
 
-// Главная функция игры
-int main() 
+Direction HandleInput(Direction currentDir) 
 {
-  // Инициализация генератора случайных чисел
+  if (_kbhit()) 
+  {
+    char key = _getch();
+    switch (key) 
+    {
+    case 'w':
+    case 'W':
+      if (currentDir != DOWN) return UP;
+      break;
+    case 's':
+    case 'S':
+      if (currentDir != UP) return DOWN;
+      break;
+    case 'a':
+    case 'A':
+      if (currentDir != RIGHT) return LEFT;
+      break;
+    case 'd':
+    case 'D':
+      if (currentDir != LEFT) return RIGHT;
+      break;
+    }
+  }
+  return currentDir;
+}
+
+int main() {
   srand(static_cast < unsigned > (time(nullptr)));
 
-  // Инициализация игровых объектов
-  auto snake = GenerateSnake();  // Создание змейки
-  auto apple = GenerateApple(snake);  // Создание первого яблока
-  Direction currentDir = RIGHT;  // Начальное направление движения
-  int score = 0;                 // Начальный счет
-  bool gameOver = false;         // Флаг окончания игры
-  bool firstDraw = true;         // Флаг первой отрисовки
+  auto snake = GenerateSnake();
+  auto oldSnake = snake;
+  auto apple = GenerateApple(snake);
+  Direction currentDir = RIGHT;
+  int score = 0;
+  bool gameOver = false;
+  bool firstDraw = true;
 
-  // Главный игровой цикл
   while (!gameOver) 
   {
-    // Отрисовка игрового поля
-    DrawField(snake, apple, score, firstDraw);
-    firstDraw = false;  // После первой отрисовки сбрасываем флаг
+    DrawField(snake, oldSnake, apple, score, firstDraw);
+    firstDraw = false;
 
-    // Обработка пользовательского ввода
-    if (_kbhit())  // Проверка нажатия клавиши
-    {
-      char key = _getch();  // Получение символа нажатой клавиши
-      // Изменение направления в зависимости от нажатой клавиши
-      switch (key) 
-      {
-      case 'w':
-      case 'W':
-        if (currentDir != DOWN) currentDir = UP;     // Вверх (если не движемся вниз)
-        break;
-      case 's':
-      case 'S':
-        if (currentDir != UP) currentDir = DOWN;     // Вниз (если не движемся вверх)
-        break;
-      case 'a':
-      case 'A':
-        if (currentDir != RIGHT) currentDir = LEFT;  // Влево (если не движемся вправо)
-        break;
-      case 'd':
-      case 'D':
-        if (currentDir != LEFT) currentDir = RIGHT;  // Вправо (если не движемся влево)
-        break;
-      }
-    }
+    oldSnake = snake;
+    currentDir = HandleInput(currentDir);
 
-    // Проверка съедания яблока
     bool grow = false;
-    if (snake[0] == apple)  // Если голова на яблоке
+    if (snake[0] == apple) 
     {
-      apple = GenerateApple(snake);  // Генерация нового яблока
-      score++;                       // Увеличение счета
-      grow = true;                   // Установка флага роста змейки
+      apple = GenerateApple(snake);
+      score++;
+      grow = true;
     }
 
-    // Движение змейки
     MoveSnake(snake, currentDir, grow);
 
-    // Проверка столкновений
-    if (CheckCollision(snake)) 
-    {
-      gameOver = true;  // Завершение игры при столкновении
+    if (CheckCollision(snake)) {
+      gameOver = true;
     }
 
-    // Задержка для контроля скорости игры
     Sleep(GAME_SPEED);
   }
 
-  // Вывод сообщения о конце игры
-  SetCursorPosition(0, FIELD_HEIGHT + 8);
+  SetCursorPosition(0, INFO_START_Y + 5);
   cout << MSG_GAME_OVER << '\n';
 
   return 0;
